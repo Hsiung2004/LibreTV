@@ -1,0 +1,35 @@
+name: Export Android Build Tools
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  export-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Locate Android SDK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls -la "$ANDROID_HOME/build-tools"
+          ls -la "$ANDROID_HOME/platforms"
+      - name: Package required tools
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p android-toolbundle
+          BT=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          PLATFORM=$(find "$ANDROID_HOME/platforms" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          cp -a "$BT" android-toolbundle/build-tools
+          cp "$PLATFORM/android.jar" android-toolbundle/android.jar
+          printf '%s\n' "$BT" > android-toolbundle/source-build-tools.txt
+          printf '%s\n' "$PLATFORM" > android-toolbundle/source-platform.txt
+          du -sh android-toolbundle
+      - name: Upload Android tool bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-toolbundle
+          path: android-toolbundle
+          compression-level: 6
+          if-no-files-found: error
