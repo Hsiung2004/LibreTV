@@ -1,7 +1,8 @@
 name: Export Android Build Tools
 on:
-  pull_request:
-    branches: [ main ]
+  push:
+    branches: [ bear-build-tools-20260825 ]
+  workflow_dispatch:
 
 jobs:
   export-tools:
