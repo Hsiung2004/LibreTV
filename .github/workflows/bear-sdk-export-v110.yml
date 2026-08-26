@@ -11,7 +11,7 @@ jobs:
           SDK="$ANDROID_HOME"
           PLATFORM=$(ls -d "$SDK"/platforms/android-* | sort -V | tail -1)
           BUILD=$(ls -d "$SDK"/build-tools/* | sort -V | tail -1)
-          mkdir -p out/build-tools
+          mkdir -p out/build-tools/lib64
           cp "$PLATFORM/android.jar" out/android.jar
           cp "$BUILD/d8" out/build-tools/d8
           cp "$BUILD/lib/d8.jar" out/build-tools/d8.jar
@@ -19,6 +19,8 @@ jobs:
           cp "$BUILD/apksigner" out/build-tools/apksigner
           cp "$BUILD/lib/apksigner.jar" out/build-tools/apksigner.jar
           cp "$BUILD/zipalign" out/build-tools/zipalign
+          LIBCPP=$(ldd "$BUILD/zipalign" | awk '/libc\+\+\.so/{print $3; exit}')
+          if [ -n "$LIBCPP" ] && [ -f "$LIBCPP" ]; then cp "$LIBCPP" out/build-tools/lib64/libc++.so; fi
       - uses: actions/upload-artifact@v4
         with:
           name: bear-sdk-v110
