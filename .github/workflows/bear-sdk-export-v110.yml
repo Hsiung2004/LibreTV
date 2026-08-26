@@ -14,10 +14,10 @@ jobs:
           mkdir -p out/build-tools
           cp "$PLATFORM/android.jar" out/android.jar
           cp "$BUILD/d8" out/build-tools/d8
-          cp "$BUILD/d8.jar" out/build-tools/d8.jar
+          cp "$BUILD/lib/d8.jar" out/build-tools/d8.jar
           cp "$BUILD/aapt2" out/build-tools/aapt2
           cp "$BUILD/apksigner" out/build-tools/apksigner
-          cp "$BUILD/apksigner.jar" out/build-tools/apksigner.jar
+          cp "$BUILD/lib/apksigner.jar" out/build-tools/apksigner.jar
           cp "$BUILD/zipalign" out/build-tools/zipalign
       - uses: actions/upload-artifact@v4
         with:
