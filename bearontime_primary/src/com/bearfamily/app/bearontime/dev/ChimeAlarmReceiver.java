@@ -21,6 +21,8 @@ public final class ChimeAlarmReceiver extends BroadcastReceiver {
     @Override public void onReceive(final Context context, Intent intent) {
         final Context app = context.getApplicationContext();
         final PendingResult result = goAsync();
+        final SharedPreferences initial = app.getSharedPreferences(NativeChimeScheduler.PREF, Context.MODE_PRIVATE);
+        final long scheduledAt = initial.getLong("nextAt", 0L);
         NativeChimeScheduler.scheduleNext(app);
         new Thread(new Runnable() {
             @Override public void run() {
@@ -33,6 +35,8 @@ public final class ChimeAlarmReceiver extends BroadcastReceiver {
                     }
                     SharedPreferences p = app.getSharedPreferences(NativeChimeScheduler.PREF, Context.MODE_PRIVATE);
                     Calendar cal = Calendar.getInstance();
+                    long now = System.currentTimeMillis();
+                    if (scheduledAt > 0 && Math.abs(now - scheduledAt) <= 120000L) cal.setTimeInMillis(scheduledAt);
                     int minute = cal.get(Calendar.MINUTE);
                     if (!(minute == 0 || minute == 30) || !NativeChimeScheduler.allowedNow(p, cal)) {
                         finish(result, wake);
@@ -45,7 +49,7 @@ public final class ChimeAlarmReceiver extends BroadcastReceiver {
                         finish(result, wake);
                         return;
                     }
-                    p.edit().putString("lastKey", key).putLong("lastFire", System.currentTimeMillis())
+                    p.edit().putString("lastKey", key).putLong("lastFire", now)
                             .putString("lastKind", minute == 0 ? "hour" : "half").apply();
                     startPlayback(app, p, cal, result, wake);
                 } catch (Throwable t) {
