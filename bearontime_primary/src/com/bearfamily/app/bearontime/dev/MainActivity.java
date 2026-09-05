@@ -2,6 +2,7 @@ package com.bearfamily.app.bearontime.dev;
 
 import android.app.ActionBar;
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -43,6 +44,15 @@ public class MainActivity extends Activity {
 
         webView.loadUrl("file:///android_asset/index.html");
         setContentView(webView);
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        try {
+            if (chimeBridge != null && chimeBridge.handleActivityResult(requestCode, resultCode, data)) {
+                return;
+            }
+        } catch (Throwable ignored) { }
+        super.onActivityResult(requestCode, resultCode, data);
     }
 
     @Override public void onBackPressed() {
