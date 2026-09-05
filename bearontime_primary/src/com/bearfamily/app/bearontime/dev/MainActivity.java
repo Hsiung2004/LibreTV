@@ -6,12 +6,15 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 public class MainActivity extends Activity {
     private NativeChimeBridge chimeBridge;
     private NativeChimeScheduler schedulerBridge;
     private VoiceBackupBridge voiceBackupBridge;
     private WidgetBridge widgetBridge;
+    private WebView webView;
+    private String pendingOpenPage = "";
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -26,7 +29,7 @@ public class MainActivity extends Activity {
             }, 1001);
         }
 
-        WebView webView = new WebView(this);
+        webView = new WebView(this);
         webView.setId(1);
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -37,6 +40,12 @@ public class MainActivity extends Activity {
         settings.setGeolocationEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
         webView.setWebChromeClient(new GeoChrome());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                applyPendingOpenPage();
+            }
+        });
 
         try {
             chimeBridge = new NativeChimeBridge(this, webView);
@@ -64,12 +73,13 @@ public class MainActivity extends Activity {
             widgetBridge = null;
         }
 
-        webView.loadUrl(initialUrl(getIntent()));
+        pendingOpenPage = requestedPage(getIntent());
+        webView.loadUrl(initialUrl(pendingOpenPage));
         setContentView(webView);
     }
 
-    private String initialUrl(Intent intent) {
-        String p = requestedPage(intent);
+    private String initialUrl(String p) {
+        if ("quickadd".equals(p)) return "file:///android_asset/index.html#home";
         return "file:///android_asset/index.html" + (p.isEmpty() ? "" : "#" + p);
     }
 
@@ -79,8 +89,25 @@ public class MainActivity extends Activity {
         if (p == null) p = "";
         p = p.trim().toLowerCase();
         if ("weather".equals(p) || "expense".equals(p) || "widgets".equals(p)
-                || "calendar".equals(p) || "home".equals(p)) return p;
+                || "calendar".equals(p) || "home".equals(p) || "quickadd".equals(p)) return p;
         return "";
+    }
+
+    private void applyPendingOpenPage() {
+        if (webView == null || pendingOpenPage == null || pendingOpenPage.isEmpty()) return;
+        final String p = pendingOpenPage;
+        pendingOpenPage = "";
+        webView.postDelayed(new Runnable() {
+            @Override public void run() {
+                try {
+                    if ("quickadd".equals(p)) {
+                        webView.evaluateJavascript("window.go&&go('home');setTimeout(function(){window.quickAddForHome&&quickAddForHome()},120)", null);
+                    } else {
+                        webView.evaluateJavascript("window.go&&go('" + p + "')", null);
+                    }
+                } catch (Throwable ignored) { }
+            }
+        }, 120L);
     }
 
     @Override protected void onNewIntent(Intent intent) {
@@ -88,17 +115,11 @@ public class MainActivity extends Activity {
         setIntent(intent);
         String p = requestedPage(intent);
         if (p.isEmpty()) return;
-        WebView webView = (WebView) findViewById(1);
-        if (webView != null) {
-            final String page = p;
-            webView.post(new Runnable() {
-                @Override public void run() {
-                    try {
-                        webView.evaluateJavascript("window.go&&go('" + page + "')", null);
-                    } catch (Throwable ignored) { }
-                }
-            });
-        }
+        pendingOpenPage = p;
+        if (webView == null) return;
+        webView.post(new Runnable() {
+            @Override public void run() { applyPendingOpenPage(); }
+        });
     }
 
     @Override protected void onResume() {
@@ -117,7 +138,6 @@ public class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
-        WebView webView = (WebView) findViewById(1);
         if (webView != null && webView.canGoBack()) {
             webView.goBack();
             return;
@@ -131,6 +151,7 @@ public class MainActivity extends Activity {
         schedulerBridge = null;
         voiceBackupBridge = null;
         widgetBridge = null;
+        webView = null;
         super.onDestroy();
     }
 }
