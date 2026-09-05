@@ -1,20 +1,14 @@
-name: BearOnTime DEV18.7.2 Primary DEX Build
+name: BearOnTime DEV18.8 Primary DEX Build
 
 on:
   push:
-    branches: [bearontime-dev18-7-2-primary]
+    branches: [bearontime-dev18-8-audio]
 
 jobs:
   build-dex:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Locate Android SDK
-        shell: bash
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          ls "$ANDROID_HOME/platforms" | tail
-          ls "$ANDROID_HOME/build-tools" | tail
       - name: Compile primary classes.dex
         shell: bash
         run: |
@@ -29,6 +23,6 @@ jobs:
           sha256sum build/dex/classes.dex
       - uses: actions/upload-artifact@v4
         with:
-          name: bearontime-dev18-7-2-primary-dex
+          name: bearontime-dev18-8-primary-dex
           path: build/dex/classes.dex
           retention-days: 1
