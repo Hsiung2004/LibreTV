@@ -1,8 +1,8 @@
-name: BearOnTime DEV18.10 Native Scheduler DEX Build
+name: BearOnTime DEV18.11 Voice Backup DEX Build
 
 on:
   push:
-    branches: [bearontime-dev18-10-native-schedule]
+    branches: [bearontime-dev18-11-voice-backup]
 
 jobs:
   build-dex:
@@ -23,6 +23,6 @@ jobs:
           sha256sum build/dex/classes.dex
       - uses: actions/upload-artifact@v4
         with:
-          name: bearontime-dev18-10-primary-dex
+          name: bearontime-dev18-11-primary-dex
           path: build/dex/classes.dex
           retention-days: 1
