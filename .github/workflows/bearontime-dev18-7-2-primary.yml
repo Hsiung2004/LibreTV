@@ -1,8 +1,8 @@
-name: BearOnTime DEV18.12 Widget DEX Build
+name: BearOnTime DEV18.12.2 Widget Action DEX Build
 
 on:
   push:
-    branches: [bearontime-dev18-12-widget]
+    branches: [bearontime-dev18-12-2-widget-actions]
 
 jobs:
   build-dex:
@@ -33,7 +33,7 @@ jobs:
           sha256sum build/classes.dex build/classes2.dex
       - uses: actions/upload-artifact@v4
         with:
-          name: bearontime-dev18-12-dex
+          name: bearontime-dev18-12-2-dex
           path: |
             build/classes.dex
             build/classes2.dex
