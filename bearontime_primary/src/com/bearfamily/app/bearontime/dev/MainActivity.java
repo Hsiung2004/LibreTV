@@ -10,6 +10,7 @@ import android.webkit.WebView;
 public class MainActivity extends Activity {
     private NativeChimeBridge chimeBridge;
     private NativeChimeScheduler schedulerBridge;
+    private VoiceBackupBridge voiceBackupBridge;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -49,6 +50,12 @@ public class MainActivity extends Activity {
         } catch (Throwable ignored) {
             schedulerBridge = null;
         }
+        try {
+            voiceBackupBridge = new VoiceBackupBridge(this, webView);
+            webView.addJavascriptInterface(voiceBackupBridge, "BearVoiceBackup");
+        } catch (Throwable ignored) {
+            voiceBackupBridge = null;
+        }
 
         webView.loadUrl("file:///android_asset/index.html");
         setContentView(webView);
@@ -62,6 +69,9 @@ public class MainActivity extends Activity {
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         try {
             if (chimeBridge != null && chimeBridge.handleActivityResult(requestCode, resultCode, data)) return;
+        } catch (Throwable ignored) { }
+        try {
+            if (voiceBackupBridge != null && voiceBackupBridge.handleActivityResult(requestCode, resultCode, data)) return;
         } catch (Throwable ignored) { }
         super.onActivityResult(requestCode, resultCode, data);
     }
@@ -79,6 +89,7 @@ public class MainActivity extends Activity {
         try { if (chimeBridge != null) chimeBridge.stop(); } catch (Throwable ignored) { }
         chimeBridge = null;
         schedulerBridge = null;
+        voiceBackupBridge = null;
         super.onDestroy();
     }
 }
