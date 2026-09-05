@@ -7,9 +7,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Build;
-import android.provider.AlarmClock;
-import android.util.TypedValue;
+import android.view.View;
 import android.widget.RemoteViews;
 
 abstract class BearWidgetBaseProvider extends AppWidgetProvider {
@@ -43,57 +41,58 @@ abstract class BearWidgetBaseProvider extends AppWidgetProvider {
         int refresh = id(context, "widget_refresh");
         int next = id(context, "widget_next");
 
-        // TIME AREA: always Android/Samsung system clock alarm list, never BearOnTime MainActivity.
-        if (open != 0) {
-            rv.setOnClickPendingIntent(open, alarmIntent(context, 1200 + appWidgetId));
-            try {
-                float sp = "large".equals(sizeName()) ? 38f : ("medium".equals(sizeName()) ? 32f : 30f);
-                rv.setTextViewTextSize(open, TypedValue.COMPLEX_UNIT_SP, sp);
-            } catch (Throwable ignored) { }
-        }
+        if (open != 0) rv.setOnClickPendingIntent(open,
+                widgetAction(context, WidgetActionReceiver.ACTION_TIME, 41200 + appWidgetId));
 
         if ("small".equals(sizeName())) {
             if (refresh != 0) {
                 rv.setTextViewText(refresh, "🌤");
-                rv.setOnClickPendingIntent(refresh, appPage(context, "weather", 2200 + appWidgetId));
+                rv.setOnClickPendingIntent(refresh,
+                        widgetAction(context, WidgetActionReceiver.ACTION_WEATHER, 42200 + appWidgetId));
             }
         } else if ("medium".equals(sizeName())) {
             if (line1 != 0) {
                 rv.setTextViewText(line1, "📅 日曆");
-                rv.setOnClickPendingIntent(line1, appPage(context, "calendar", 2300 + appWidgetId));
+                rv.setOnClickPendingIntent(line1,
+                        widgetAction(context, WidgetActionReceiver.ACTION_CALENDAR, 42300 + appWidgetId));
             }
             if (line2 != 0) {
                 rv.setTextViewText(line2, "💰 記帳");
-                rv.setOnClickPendingIntent(line2, appPage(context, "expense", 2400 + appWidgetId));
+                rv.setOnClickPendingIntent(line2,
+                        widgetAction(context, WidgetActionReceiver.ACTION_EXPENSE, 42400 + appWidgetId));
             }
             if (refresh != 0) {
                 rv.setTextViewText(refresh, "＋ 快速新增");
-                rv.setOnClickPendingIntent(refresh, appPage(context, "quickadd", 2500 + appWidgetId));
+                rv.setOnClickPendingIntent(refresh,
+                        widgetAction(context, WidgetActionReceiver.ACTION_QUICK_ADD, 42500 + appWidgetId));
             }
         } else {
-            // LARGE WIDGET = four independent zones:
-            // 1. time -> system alarm, 2. quick add -> quick add prompt,
-            // 3. calendar -> calendar, 4. expense -> accounting.
-            if (line1 != 0) rv.setTextViewText(line1, "四區快捷 · 點時間開手機鬧鐘");
-            if (line2 != 0) rv.setTextViewText(line2, "下方三區各自獨立，不會共用首頁動作");
+            // LARGE = exactly four main action zones:
+            // top time -> system alarm; bottom: quick add / calendar / expense.
+            if (line1 != 0) rv.setTextViewText(line1, "📌 快捷工具");
+            if (line2 != 0) rv.setTextViewText(line2, "點下方區塊直接進入功能");
             if (line3 != 0) rv.setTextViewText(line3, "");
             if (next != 0) rv.setTextViewText(next, "熊正點報時 · 大型桌面工具");
 
             if (quick != 0) {
                 rv.setTextViewText(quick, "＋ 快速新增");
-                rv.setOnClickPendingIntent(quick, appPage(context, "quickadd", 2800 + appWidgetId));
+                rv.setOnClickPendingIntent(quick,
+                        widgetAction(context, WidgetActionReceiver.ACTION_QUICK_ADD, 42800 + appWidgetId));
             }
             if (calendar != 0) {
                 rv.setTextViewText(calendar, "📅 日曆");
-                rv.setOnClickPendingIntent(calendar, appPage(context, "calendar", 2900 + appWidgetId));
+                rv.setOnClickPendingIntent(calendar,
+                        widgetAction(context, WidgetActionReceiver.ACTION_CALENDAR, 42900 + appWidgetId));
             }
             if (expense != 0) {
                 rv.setTextViewText(expense, "💰 記帳");
-                rv.setOnClickPendingIntent(expense, appPage(context, "expense", 3000 + appWidgetId));
+                rv.setOnClickPendingIntent(expense,
+                        widgetAction(context, WidgetActionReceiver.ACTION_EXPENSE, 43000 + appWidgetId));
             }
             if (refresh != 0) {
-                rv.setTextViewText(refresh, "↻");
-                rv.setOnClickPendingIntent(refresh, appPage(context, "widgets", 3100 + appWidgetId));
+                // Large widget is deliberately four-zone only. Hide the old fifth refresh target.
+                rv.setViewVisibility(refresh, View.GONE);
+                rv.setOnClickPendingIntent(refresh, null);
             }
         }
 
@@ -109,26 +108,13 @@ abstract class BearWidgetBaseProvider extends AppWidgetProvider {
         } catch (Throwable ignored) { }
     }
 
-    private static PendingIntent alarmIntent(Context c, int requestCode) {
-        Intent i = new Intent(AlarmClock.ACTION_SHOW_ALARMS);
-        // Samsung: explicitly target Samsung Clock so the click cannot resolve back into BearOnTime.
-        if (Build.MANUFACTURER != null && Build.MANUFACTURER.toLowerCase().contains("samsung")) {
-            i.setPackage("com.sec.android.app.clockpackage");
-        }
-        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        return PendingIntent.getActivity(c, requestCode, i,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-    }
-
-    private static PendingIntent appPage(Context c, String page, int requestCode) {
-        Intent i = new Intent();
-        i.setClassName(c.getPackageName(), c.getPackageName() + ".MainActivity");
-        i.setAction(c.getPackageName() + ".WIDGET_" + page.toUpperCase());
-        i.putExtra("openPage", page);
-        i.setData(Uri.parse("bearontime://widget/" + page + "/" + requestCode));
-        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        return PendingIntent.getActivity(c, requestCode, i,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    private static PendingIntent widgetAction(Context c, String action, int requestCode) {
+        Intent i = new Intent(c, WidgetActionReceiver.class);
+        i.setAction(action);
+        i.setData(Uri.parse("bearontime://widget-action/v18_12_2/" + action.substring(action.lastIndexOf('.') + 1)
+                + "/" + requestCode));
+        return PendingIntent.getBroadcast(c, requestCode, i,
+                PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
     private static int id(Context c, String name) { return res(c, "id", name); }
