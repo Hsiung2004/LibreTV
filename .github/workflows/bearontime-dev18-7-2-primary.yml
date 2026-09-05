@@ -1,8 +1,8 @@
-name: BearOnTime DEV18.8 Primary DEX Build
+name: BearOnTime DEV18.9 Primary DEX Build
 
 on:
   push:
-    branches: [bearontime-dev18-8-audio]
+    branches: [bearontime-dev18-9-voice]
 
 jobs:
   build-dex:
@@ -23,6 +23,6 @@ jobs:
           sha256sum build/dex/classes.dex
       - uses: actions/upload-artifact@v4
         with:
-          name: bearontime-dev18-8-primary-dex
+          name: bearontime-dev18-9-primary-dex
           path: build/dex/classes.dex
           retention-days: 1
