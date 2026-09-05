@@ -34,27 +34,31 @@ public final class ChimeAlarmReceiver extends BroadcastReceiver {
                     SharedPreferences p = app.getSharedPreferences(NativeChimeScheduler.PREF, Context.MODE_PRIVATE);
                     Calendar cal = Calendar.getInstance();
                     int minute = cal.get(Calendar.MINUTE);
-                    if (!(minute == 0 || minute == 30) || !NativeChimeScheduler.allowedNow(p, cal)) return;
+                    if (!(minute == 0 || minute == 30) || !NativeChimeScheduler.allowedNow(p, cal)) {
+                        finish(result, wake);
+                        return;
+                    }
                     String key = String.format(Locale.US, "%04d-%02d-%02d-%02d-%02d",
                             cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH),
                             cal.get(Calendar.HOUR_OF_DAY), minute);
-                    if (key.equals(p.getString("lastKey", ""))) return;
+                    if (key.equals(p.getString("lastKey", ""))) {
+                        finish(result, wake);
+                        return;
+                    }
                     p.edit().putString("lastKey", key).putLong("lastFire", System.currentTimeMillis())
                             .putString("lastKind", minute == 0 ? "hour" : "half").apply();
-                    play(app, p, cal, result, wake);
-                    return;
+                    startPlayback(app, p, cal, result, wake);
                 } catch (Throwable t) {
                     app.getSharedPreferences(NativeChimeScheduler.PREF, Context.MODE_PRIVATE).edit()
                             .putString("lastError", "receiver: " + NativeChimeScheduler.msg(t)).apply();
+                    finish(result, wake);
                 }
-                try { if (wake != null && wake.isHeld()) wake.release(); } catch (Throwable ignored) { }
-                try { result.finish(); } catch (Throwable ignored) { }
             }
         }, "BearNativeChime").start();
     }
 
-    private static void play(final Context c, final SharedPreferences p, Calendar cal,
-                             final PendingResult result, final PowerManager.WakeLock wake) throws Exception {
+    private static void startPlayback(final Context c, final SharedPreferences p, Calendar cal,
+                                      final PendingResult result, final PowerManager.WakeLock wake) throws Exception {
         final AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
         if (am == null) throw new IllegalStateException("AudioManager unavailable");
         final NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -99,29 +103,19 @@ public final class ChimeAlarmReceiver extends BroadcastReceiver {
         } else {
             first = "asset:audio/" + halfFile(p.getString("halfTone", "classic"));
         }
-        playOne(c, first, new Runnable() {
-            @Override public void run() {
-                String secondPath = secondHolder;
-            }
-        });
-        // play sequence using holder to keep Java 8 anonymous classes simple
+
         playSequence(c, first, second, new Runnable() {
             @Override public void run() {
-                restore(c, am, nm, savedVolume, savedFilter[0], focus[0], p, "");
-                try { if (wake != null && wake.isHeld()) wake.release(); } catch (Throwable ignored) { }
-                try { result.finish(); } catch (Throwable ignored) { }
+                restore(am, nm, savedVolume, savedFilter[0], focus[0], p, "");
+                finish(result, wake);
             }
         }, new ErrorDone() {
             @Override public void done(String error) {
-                restore(c, am, nm, savedVolume, savedFilter[0], focus[0], p, error);
-                try { if (wake != null && wake.isHeld()) wake.release(); } catch (Throwable ignored) { }
-                try { result.finish(); } catch (Throwable ignored) { }
+                restore(am, nm, savedVolume, savedFilter[0], focus[0], p, error);
+                finish(result, wake);
             }
         });
     }
-
-    // Dummy field referenced only to avoid accidental capture rewrite in old javac; never used.
-    private static String secondHolder = "";
 
     private interface ErrorDone { void done(String error); }
 
@@ -134,8 +128,6 @@ public final class ChimeAlarmReceiver extends BroadcastReceiver {
             }
         }, err);
     }
-
-    private static void playOne(Context c, String source, Runnable ok) { playOne(c, source, ok, new ErrorDone(){@Override public void done(String e){}}); }
 
     private static void playOne(final Context c, final String source, final Runnable ok, final ErrorDone err) {
         try {
@@ -197,7 +189,8 @@ public final class ChimeAlarmReceiver extends BroadcastReceiver {
             File[] files = dir.listFiles();
             if (files != null) {
                 String prefix = String.format(Locale.US, "%02d_00.", h);
-                for (File f : files) if (f != null && f.isFile() && f.getName().toLowerCase(Locale.US).startsWith(prefix)) return f.getAbsolutePath();
+                for (File f : files) if (f != null && f.isFile()
+                        && f.getName().toLowerCase(Locale.US).startsWith(prefix)) return f.getAbsolutePath();
             }
         }
         return "asset:audio/voices/" + String.format(Locale.US, "%02d_00.mp3", h);
@@ -215,7 +208,7 @@ public final class ChimeAlarmReceiver extends BroadcastReceiver {
         return i >= 0 ? path.substring(i) : ".bin";
     }
 
-    private static void restore(Context c, AudioManager am, NotificationManager nm, int volume,
+    private static void restore(AudioManager am, NotificationManager nm, int volume,
                                 int filter, AudioFocusRequest focus, SharedPreferences p, String error) {
         try { am.setStreamVolume(AudioManager.STREAM_ALARM, volume, 0); } catch (Throwable ignored) { }
         if (Build.VERSION.SDK_INT >= 23 && nm != null && filter >= 0) {
@@ -227,5 +220,10 @@ public final class ChimeAlarmReceiver extends BroadcastReceiver {
             try { am.abandonAudioFocus(null); } catch (Throwable ignored) { }
         }
         p.edit().putString("lastError", error == null ? "" : error).apply();
+    }
+
+    private static void finish(PendingResult result, PowerManager.WakeLock wake) {
+        try { if (wake != null && wake.isHeld()) wake.release(); } catch (Throwable ignored) { }
+        try { result.finish(); } catch (Throwable ignored) { }
     }
 }
