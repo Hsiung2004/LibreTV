@@ -7,7 +7,9 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.provider.AlarmClock;
+import android.util.TypedValue;
 import android.widget.RemoteViews;
 
 abstract class BearWidgetBaseProvider extends AppWidgetProvider {
@@ -19,15 +21,11 @@ abstract class BearWidgetBaseProvider extends AppWidgetProvider {
         for (int id : ids) updateOne(context, manager, id);
     }
 
-    @Override public void onEnabled(Context context) {
-        updateAll(context);
-    }
+    @Override public void onEnabled(Context context) { updateAll(context); }
 
     @Override public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
-        if (intent != null && AppWidgetManager.ACTION_APPWIDGET_UPDATE.equals(intent.getAction())) {
-            updateAll(context);
-        }
+        if (intent != null && AppWidgetManager.ACTION_APPWIDGET_UPDATE.equals(intent.getAction())) updateAll(context);
     }
 
     protected void updateOne(Context context, AppWidgetManager manager, int appWidgetId) {
@@ -45,7 +43,14 @@ abstract class BearWidgetBaseProvider extends AppWidgetProvider {
         int refresh = id(context, "widget_refresh");
         int next = id(context, "widget_next");
 
-        if (open != 0) rv.setOnClickPendingIntent(open, alarmIntent(context, 1200 + appWidgetId));
+        // TIME AREA: always Android/Samsung system clock alarm list, never BearOnTime MainActivity.
+        if (open != 0) {
+            rv.setOnClickPendingIntent(open, alarmIntent(context, 1200 + appWidgetId));
+            try {
+                float sp = "large".equals(sizeName()) ? 38f : ("medium".equals(sizeName()) ? 32f : 30f);
+                rv.setTextViewTextSize(open, TypedValue.COMPLEX_UNIT_SP, sp);
+            } catch (Throwable ignored) { }
+        }
 
         if ("small".equals(sizeName())) {
             if (refresh != 0) {
@@ -54,35 +59,33 @@ abstract class BearWidgetBaseProvider extends AppWidgetProvider {
             }
         } else if ("medium".equals(sizeName())) {
             if (line1 != 0) {
-                rv.setTextViewText(line1, "🌤  天氣預報");
-                rv.setOnClickPendingIntent(line1, appPage(context, "weather", 2300 + appWidgetId));
+                rv.setTextViewText(line1, "📅 日曆");
+                rv.setOnClickPendingIntent(line1, appPage(context, "calendar", 2300 + appWidgetId));
             }
             if (line2 != 0) {
-                rv.setTextViewText(line2, "💰  記帳");
+                rv.setTextViewText(line2, "💰 記帳");
                 rv.setOnClickPendingIntent(line2, appPage(context, "expense", 2400 + appWidgetId));
             }
             if (refresh != 0) {
-                rv.setTextViewText(refresh, "↻ 更新");
-                rv.setOnClickPendingIntent(refresh, appPage(context, "widgets", 2500 + appWidgetId));
+                rv.setTextViewText(refresh, "＋ 快速新增");
+                rv.setOnClickPendingIntent(refresh, appPage(context, "quickadd", 2500 + appWidgetId));
             }
         } else {
-            if (line1 != 0) {
-                rv.setTextViewText(line1, "🌤 天氣預報");
-                rv.setOnClickPendingIntent(line1, appPage(context, "weather", 2600 + appWidgetId));
-            }
-            if (line2 != 0) {
-                rv.setTextViewText(line2, "💰 今日記帳");
-                rv.setOnClickPendingIntent(line2, appPage(context, "expense", 2700 + appWidgetId));
-            }
-            if (line3 != 0) rv.setTextViewText(line3, "點下方區塊快速進入功能");
-            if (next != 0) rv.setTextViewText(next, "熊正點報時 · 桌面快捷");
+            // LARGE WIDGET = four independent zones:
+            // 1. time -> system alarm, 2. quick add -> quick add prompt,
+            // 3. calendar -> calendar, 4. expense -> accounting.
+            if (line1 != 0) rv.setTextViewText(line1, "四區快捷 · 點時間開手機鬧鐘");
+            if (line2 != 0) rv.setTextViewText(line2, "下方三區各自獨立，不會共用首頁動作");
+            if (line3 != 0) rv.setTextViewText(line3, "");
+            if (next != 0) rv.setTextViewText(next, "熊正點報時 · 大型桌面工具");
+
             if (quick != 0) {
-                rv.setTextViewText(quick, "⏰ 系統鬧鐘");
-                rv.setOnClickPendingIntent(quick, alarmIntent(context, 2800 + appWidgetId));
+                rv.setTextViewText(quick, "＋ 快速新增");
+                rv.setOnClickPendingIntent(quick, appPage(context, "quickadd", 2800 + appWidgetId));
             }
             if (calendar != 0) {
-                rv.setTextViewText(calendar, "🌤 天氣");
-                rv.setOnClickPendingIntent(calendar, appPage(context, "weather", 2900 + appWidgetId));
+                rv.setTextViewText(calendar, "📅 日曆");
+                rv.setOnClickPendingIntent(calendar, appPage(context, "calendar", 2900 + appWidgetId));
             }
             if (expense != 0) {
                 rv.setTextViewText(expense, "💰 記帳");
@@ -108,6 +111,10 @@ abstract class BearWidgetBaseProvider extends AppWidgetProvider {
 
     private static PendingIntent alarmIntent(Context c, int requestCode) {
         Intent i = new Intent(AlarmClock.ACTION_SHOW_ALARMS);
+        // Samsung: explicitly target Samsung Clock so the click cannot resolve back into BearOnTime.
+        if (Build.MANUFACTURER != null && Build.MANUFACTURER.toLowerCase().contains("samsung")) {
+            i.setPackage("com.sec.android.app.clockpackage");
+        }
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         return PendingIntent.getActivity(c, requestCode, i,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -116,8 +123,9 @@ abstract class BearWidgetBaseProvider extends AppWidgetProvider {
     private static PendingIntent appPage(Context c, String page, int requestCode) {
         Intent i = new Intent();
         i.setClassName(c.getPackageName(), c.getPackageName() + ".MainActivity");
+        i.setAction(c.getPackageName() + ".WIDGET_" + page.toUpperCase());
         i.putExtra("openPage", page);
-        i.setData(Uri.parse("bearontime://open/" + page + "/" + requestCode));
+        i.setData(Uri.parse("bearontime://widget/" + page + "/" + requestCode));
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         return PendingIntent.getActivity(c, requestCode, i,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
