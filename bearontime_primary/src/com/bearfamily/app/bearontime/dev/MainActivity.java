@@ -11,6 +11,7 @@ public class MainActivity extends Activity {
     private NativeChimeBridge chimeBridge;
     private NativeChimeScheduler schedulerBridge;
     private VoiceBackupBridge voiceBackupBridge;
+    private WidgetBridge widgetBridge;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -56,9 +57,48 @@ public class MainActivity extends Activity {
         } catch (Throwable ignored) {
             voiceBackupBridge = null;
         }
+        try {
+            widgetBridge = new WidgetBridge(this);
+            webView.addJavascriptInterface(widgetBridge, "BearWidget");
+        } catch (Throwable ignored) {
+            widgetBridge = null;
+        }
 
-        webView.loadUrl("file:///android_asset/index.html");
+        webView.loadUrl(initialUrl(getIntent()));
         setContentView(webView);
+    }
+
+    private String initialUrl(Intent intent) {
+        String p = requestedPage(intent);
+        return "file:///android_asset/index.html" + (p.isEmpty() ? "" : "#" + p);
+    }
+
+    private String requestedPage(Intent intent) {
+        if (intent == null) return "";
+        String p = intent.getStringExtra("openPage");
+        if (p == null) p = "";
+        p = p.trim().toLowerCase();
+        if ("weather".equals(p) || "expense".equals(p) || "widgets".equals(p)
+                || "calendar".equals(p) || "home".equals(p)) return p;
+        return "";
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String p = requestedPage(intent);
+        if (p.isEmpty()) return;
+        WebView webView = (WebView) findViewById(1);
+        if (webView != null) {
+            final String page = p;
+            webView.post(new Runnable() {
+                @Override public void run() {
+                    try {
+                        webView.evaluateJavascript("window.go&&go('" + page + "')", null);
+                    } catch (Throwable ignored) { }
+                }
+            });
+        }
     }
 
     @Override protected void onResume() {
@@ -90,6 +130,7 @@ public class MainActivity extends Activity {
         chimeBridge = null;
         schedulerBridge = null;
         voiceBackupBridge = null;
+        widgetBridge = null;
         super.onDestroy();
     }
 }
